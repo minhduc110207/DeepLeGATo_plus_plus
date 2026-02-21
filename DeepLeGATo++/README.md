@@ -1,25 +1,94 @@
 # DeepLeGATo++
-## Next-Generation Galaxy Profile Fitting with Transformers and Neural Posterior Estimation
+
+## Next-Generation Galaxy Morphology Estimation with Transformers and Neural Posterior Estimation
 
 **Python 3.9+** | **PyTorch 2.0+** | **MIT License** | **Optimized for Google Colab**
 
-## Overview
+---
 
-**DeepLeGATo++** is a significant upgrade to the original [DeepLeGATo](https://arxiv.org/abs/1711.03108) (Tuccillo et al., 2017) for galaxy surface brightness profile fitting. It leverages modern deep learning architectures optimized for Google Colab.
+## 🌌 What Is This?
 
-### Key Features
+**DeepLeGATo++** (Deep Learning Galaxy Tool++) is a deep learning framework for **automated galaxy morphology estimation**. Given an image of a galaxy, the model predicts the structural parameters that describe its shape, size, brightness, and orientation — along with **full uncertainty quantification** for each prediction.
 
-- 🔭 **Swin Transformer V2** backbone for multi-scale feature extraction
-- 📊 **Neural Posterior Estimation** with full uncertainty quantification
-- ☁️ **Google Colab optimized** with Drive integration and auto-resume
-- ⚡ **Memory efficient** - runs on free T4 GPU (16GB VRAM)
-- 🎯 **7 Sérsic parameters** with credible intervals
+This is critical in astrophysics: understanding galaxy morphology helps scientists study galaxy formation, evolution, and the large-scale structure of the universe. Traditional methods (like GALFIT) require manual fitting and are extremely slow for large surveys. DeepLeGATo++ automates this process using modern neural networks, processing thousands of galaxies in seconds.
 
-## Quick Start (Google Colab)
+### The Problem
+
+Modern astronomical surveys (HST, JWST, Euclid, Rubin/LSST) produce **millions of galaxy images**. Each galaxy needs to be characterized by its **Sérsic profile** — a mathematical model that describes how a galaxy's brightness falls off from its center. Fitting these profiles traditionally requires:
+
+- Manual initial parameter guesses
+- Iterative optimization (slow, often fails)
+- No built-in uncertainty estimates
+- Hours per galaxy for complex cases
+
+### The Solution
+
+DeepLeGATo++ uses a **Swin Transformer V2** (a state-of-the-art vision model) combined with **Neural Posterior Estimation** (NPE) to:
+
+1. **Extract multi-scale features** from galaxy images using the Swin Transformer backbone
+2. **Estimate the full posterior distribution** of Sérsic parameters using normalizing flows
+3. **Provide calibrated uncertainties** — not just a point estimate, but a probability distribution over all possible parameter values
+4. **Process galaxies in batches** — thousands of galaxies per minute on a single GPU
+
+---
+
+## 🔭 What Does the Model Predict?
+
+The model estimates **7 Sérsic profile parameters** for each galaxy image:
+
+| Parameter | Symbol | Description | Prior Range |
+|-----------|--------|-------------|-------------|
+| **Magnitude** | mag | Total integrated brightness of the galaxy | [15, 28] mag |
+| **Effective Radius** | R_eff | Half-light radius (size of the galaxy) | [0.1", 10"] |
+| **Sérsic Index** | n | Controls the shape of the light profile (n=1: exponential disk, n=4: de Vaucouleurs elliptical) | [0.3, 8] |
+| **Axis Ratio** | q | Ellipticity (1 = circular, 0.1 = highly elongated) | [0.1, 1.0] |
+| **Position Angle** | PA | Orientation of the galaxy's major axis | [0°, 180°] |
+| **Center X** | x₀ | Horizontal offset from image center | [±5 px] |
+| **Center Y** | y₀ | Vertical offset from image center | [±5 px] |
+
+For each parameter, the model outputs:
+- **Point estimate** (mean prediction)
+- **Uncertainty** (standard deviation)
+- **95% credible interval** (Bayesian confidence bounds)
+- **Full posterior samples** (for custom analysis)
+
+---
+
+## 🧠 How Does It Work?
+
+### Architecture
+
+```
+                    DeepLeGATo++ Architecture
+                    
+Galaxy Image ──→ Swin Transformer V2 ──→ NPE Head ──→ Posterior Distribution
+  (128×128)         (Backbone)           (Flow)         (7 parameters)
+                        │                   │
+                  Multi-scale          Normalizing
+                   Feature              Flows (MAF)
+                  Extraction           Conditional on
+                                      image features
+```
+
+1. **Swin Transformer V2 Backbone**: A hierarchical vision transformer that processes the galaxy image at multiple scales. It uses shifted windows for efficient self-attention, capturing both local details (galaxy center, spiral arms) and global structure (overall shape, orientation). Gradient checkpointing enables training on limited GPU memory.
+
+2. **Neural Posterior Estimation (NPE) Head**: Instead of just predicting a single value for each parameter, the NPE head learns the full posterior distribution p(θ|x) — the probability of each possible parameter value given the observed image. This is done using **Masked Autoregressive Flows** (MAF), a type of normalizing flow that can model complex, multi-modal distributions.
+
+3. **Parameter Transformation**: Since morphological parameters have physical bounds (e.g., axis ratio must be between 0 and 1), a sigmoid/logit transformation maps between the bounded physical space and an unbounded latent space where the flow operates.
+
+### Training
+
+- **Simulation-Based Inference (SBI)**: The model is trained entirely on **synthetic galaxy images** generated by a GPU-accelerated Sérsic simulator with realistic noise (Poisson shot noise, read noise, sky background) and PSF convolution
+- **Loss Function**: Combines Gaussian negative log-likelihood (for point estimates) with flow loss (for posterior estimation)
+- **Self-supervised**: No real labeled data needed — the simulator generates ground truth parameters
+
+---
+
+## ⚡ Quick Start (Google Colab)
 
 1. Upload this folder to Google Drive as `My Drive/DeepLeGATo++/`
 2. Open `notebooks/03_Training.ipynb` in Google Colab
-3. Run all cells - training auto-resumes on disconnect!
+3. Run all cells — training auto-resumes on disconnect!
 
 ```python
 # Mount Drive and setup
@@ -34,49 +103,117 @@ sys.path.insert(0, '/content/drive/MyDrive/DeepLeGATo++')
 
 # Start training
 from deeplegato_pp.training import train
-train(resume=True)
+model = train(resume=True)
 ```
 
-## Architecture
+### Inference Example
 
+```python
+from deeplegato_pp.inference import Predictor
+from deeplegato_pp.models import DeepLeGAToPP
+
+# Load trained model
+model = DeepLeGAToPP.load_pretrained("path/to/checkpoint")
+predictor = Predictor(model, device="cuda")
+
+# Predict galaxy parameters with uncertainties
+result = predictor.predict(galaxy_image, num_samples=1000)
+predictor.print_results(result)
+
+# Output:
+# Parameter        Mean ± Std       95% CI
+# ─────────────────────────────────────────
+# Magnitude      22.34 ± 0.15    [22.05, 22.63]
+# R_eff           1.82 ± 0.08    [ 1.67,  1.98]
+# Sérsic n        2.41 ± 0.23    [ 1.97,  2.86]
+# Axis ratio      0.67 ± 0.03    [ 0.61,  0.73]
+# PA            127.5° ± 2.1°   [123.4°, 131.6°]
 ```
-Galaxy Image → Swin Transformer V2 → NPE Head → Posterior Distribution
-                    ↓                    ↓
-              Multi-scale          Normalizing
-               Features              Flows
-```
 
-## Output Parameters
+---
 
-| Parameter | Description | Prior Range |
-|-----------|-------------|-------------|
-| Magnitude | Total brightness | [15, 28] mag |
-| R_eff | Effective radius | [0.1", 10"] |
-| n | Sérsic index | [0.3, 8] |
-| q | Axis ratio | [0.1, 1.0] |
-| PA | Position angle | [0°, 180°] |
-| x, y | Center offset | [±5 px] |
-
-## GPU Requirements
-
-| GPU | VRAM | Batch Size | Training Time |
-|-----|------|------------|---------------|
-| T4 (Free) | 16 GB | 16 | ~8 hours |
-| A100 (Pro+) | 40 GB | 64 | ~2 hours |
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 DeepLeGATo++/
-├── notebooks/           # Colab notebooks
-├── deeplegato_pp/       # Main package
-│   ├── models/          # Swin + NPE
-│   ├── data/            # Simulators & datasets
-│   ├── training/        # Trainer & losses
-│   └── inference/       # Predictor & UQ
-├── configs/             # YAML configs
-└── tests/               # Unit tests
+├── configs/                 # YAML configuration files
+│   └── colab_t4.yaml        # Config for T4 GPU (16GB)
+├── deeplegato_pp/           # Main Python package
+│   ├── models/              # Neural network architectures
+│   │   ├── swin_backbone.py # Swin Transformer V2 feature extractor
+│   │   ├── npe_head.py      # Normalizing flow posterior estimator
+│   │   └── deeplegato_pp.py # Combined model
+│   ├── data/                # Data generation & loading
+│   │   ├── sersic_simulator.py  # GPU-accelerated galaxy simulator
+│   │   ├── psf_handler.py       # Point Spread Function handling
+│   │   └── dataset.py           # PyTorch datasets & dataloaders
+│   ├── training/            # Training infrastructure
+│   │   ├── trainer.py       # PyTorch Lightning trainer
+│   │   ├── losses.py        # NPE & physics-informed losses
+│   │   └── colab_utils.py   # Google Colab helpers
+│   └── inference/           # Prediction & analysis
+│       ├── predictor.py     # High-level prediction interface
+│       └── uncertainty.py   # Calibration & UQ utilities
+├── notebooks/               # Jupyter/Colab notebooks
+└── requirements.txt         # Python dependencies
 ```
+
+---
+
+## 💻 GPU Requirements
+
+| GPU | VRAM | Batch Size | Estimated Training Time |
+|-----|------|------------|------------------------|
+| T4 (Colab Free) | 16 GB | 16 | ~8 hours |
+| L4 (Colab Pro) | 24 GB | 32 | ~4 hours |
+| A100 (Colab Pro+) | 40 GB | 64 | ~2 hours |
+
+---
+
+## 🔬 Scientific Background
+
+### Sérsic Profile
+
+The Sérsic profile is the standard model for describing galaxy surface brightness:
+
+```
+I(r) = I_e × exp( -b_n × [(r/R_e)^(1/n) - 1] )
+```
+
+Where:
+- **I_e** is the intensity at the effective radius
+- **R_e** is the effective (half-light) radius
+- **n** is the Sérsic index (shape parameter)
+- **b_n** ≈ 2n - 1/3 (normalization constant)
+
+Different values of n correspond to different galaxy types:
+- **n ≈ 0.5**: Gaussian profile
+- **n ≈ 1**: Exponential disk (spiral galaxies)
+- **n ≈ 4**: de Vaucouleurs profile (elliptical galaxies)
+- **n > 4**: Centrally concentrated profiles (giant ellipticals)
+
+### Neural Posterior Estimation
+
+Unlike traditional methods that find a single best-fit, NPE learns the full posterior distribution p(θ|x), answering: *"Given this galaxy image, what are all the plausible parameter values and how likely is each?"* This is achieved using conditional normalizing flows — invertible neural networks that transform a simple base distribution into a complex posterior, conditioned on the image features.
+
+---
+
+## 🏗️ Built With
+
+- [PyTorch](https://pytorch.org/) — Deep learning framework
+- [PyTorch Lightning](https://lightning.ai/) — Training infrastructure
+- [timm](https://github.com/huggingface/pytorch-image-models) — Swin Transformer V2 implementation
+- [nflows](https://github.com/bayesiains/nflows) — Normalizing flows for NPE
+- [Astropy](https://www.astropy.org/) — FITS file handling
+
+---
+
+## 📖 References
+
+- **Original DeepLeGATo**: Tuccillo et al., *"Deep learning for galaxy surface brightness profile fitting"*, MNRAS, 2018 ([arXiv:1711.03108](https://arxiv.org/abs/1711.03108))
+- **Swin Transformer V2**: Liu et al., *"Swin Transformer V2: Scaling Up Capacity and Resolution"*, CVPR, 2022
+- **Neural Posterior Estimation**: Papamakarios et al., *"Sequential Neural Likelihood"*, AISTATS, 2019
+- **Sérsic Profile**: Sérsic, J.L., *"Influence of the atmospheric and instrumental dispersion on the brightness distribution in a galaxy"*, 1963
 
 ## Citation
 
@@ -98,4 +235,4 @@ If you use DeepLeGATo++ in your research, please cite:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.
