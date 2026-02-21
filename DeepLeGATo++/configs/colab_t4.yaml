@@ -1,0 +1,94 @@
+# Configuration optimized for Google Colab T4 GPU (16GB VRAM)
+
+model:
+  name: "DeepLeGATo++"
+  
+  backbone:
+    type: "swinv2_tiny_window8_256"
+    pretrained: true
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 8
+    gradient_checkpointing: true
+    drop_path_rate: 0.1
+  
+  npe:
+    num_flow_layers: 8
+    hidden_dim: 256
+    num_transforms: 5
+    num_blocks: 2
+    dropout: 0.1
+    
+  # Output parameters
+  num_params: 7  # mag, Re, n, q, PA, x, y
+  
+training:
+  batch_size: 16
+  accumulation_steps: 4  # Effective batch size: 64
+  max_epochs: 100
+  
+  optimizer:
+    type: "AdamW"
+    learning_rate: 1.0e-4
+    weight_decay: 0.05
+    betas: [0.9, 0.999]
+  
+  scheduler:
+    type: "CosineAnnealingWarmRestarts"
+    T_0: 10
+    T_mult: 2
+    eta_min: 1.0e-6
+  
+  precision: "16-mixed"  # FP16 mixed precision
+  
+  # Colab-specific settings
+  checkpoint_every_n_epochs: 1
+  save_to_drive: true
+  resume_from_latest: true
+  early_stopping_patience: 15
+  
+data:
+  image_size: 128
+  num_workers: 2  # Colab has limited CPU
+  pin_memory: true
+  prefetch_factor: 2
+  
+  # Sérsic parameter priors
+  priors:
+    magnitude: [15.0, 28.0]
+    effective_radius: [0.1, 10.0]  # arcsec
+    sersic_index: [0.3, 8.0]
+    axis_ratio: [0.1, 1.0]
+    position_angle: [0.0, 180.0]  # degrees
+    center_offset: [-5.0, 5.0]  # pixels
+  
+  # Noise model
+  noise:
+    sky_background: 0.01
+    read_noise: 5.0
+    gain: 2.5
+  
+  # Data paths (Google Drive)
+  drive_base: "/content/drive/MyDrive/DeepLeGATo++"
+  train_data_path: "${data.drive_base}/data/train"
+  val_data_path: "${data.drive_base}/data/val"
+  checkpoint_path: "${data.drive_base}/checkpoints"
+  
+  # Data generation
+  num_train_samples: 100000
+  num_val_samples: 10000
+  generate_on_the_fly: true
+  
+logging:
+  use_wandb: true
+  project_name: "DeepLeGATo++"
+  log_every_n_steps: 50
+  log_images_every_n_epochs: 5
+  
+  # Local logging
+  log_dir: "${data.drive_base}/logs"
+  
+validation:
+  val_check_interval: 1.0  # Every epoch
+  num_posterior_samples: 100  # For uncertainty estimation

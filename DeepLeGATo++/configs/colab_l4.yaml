@@ -1,0 +1,94 @@
+# Configuration optimized for Google Colab L4 GPU (24GB VRAM, Ada Lovelace)
+
+model:
+  name: "DeepLeGATo++"
+  
+  backbone:
+    type: "swinv2_base_window8_256"  # Can use base model with 24GB
+    pretrained: true
+    embed_dim: 128
+    depths: [2, 2, 18, 2]
+    num_heads: [4, 8, 16, 32]
+    window_size: 8
+    gradient_checkpointing: true  # Saves ~30% VRAM, needed for base model on 24GB
+    drop_path_rate: 0.2
+  
+  npe:
+    num_flow_layers: 16
+    hidden_dim: 512
+    num_transforms: 8
+    num_blocks: 4
+    dropout: 0.1
+    
+  # Output parameters
+  num_params: 7  # mag, Re, n, q, PA, x, y
+  
+training:
+  batch_size: 32
+  accumulation_steps: 2  # Effective batch size: 64
+  max_epochs: 100
+  
+  optimizer:
+    type: "AdamW"
+    learning_rate: 1.5e-4  # Tuned for effective batch size 64
+    weight_decay: 0.05
+    betas: [0.9, 0.999]
+  
+  scheduler:
+    type: "CosineAnnealingWarmRestarts"
+    T_0: 10
+    T_mult: 2
+    eta_min: 1.0e-6
+  
+  precision: "16-mixed"  # FP16 mixed precision, well-supported on L4
+  
+  # Colab-specific settings
+  checkpoint_every_n_epochs: 1
+  save_to_drive: true
+  resume_from_latest: true
+  early_stopping_patience: 15
+  
+data:
+  image_size: 256  # 24GB can handle 256 with grad checkpointing
+  num_workers: 2  # Colab has limited CPU
+  pin_memory: true
+  prefetch_factor: 3
+  
+  # Sérsic parameter priors
+  priors:
+    magnitude: [15.0, 28.0]
+    effective_radius: [0.1, 10.0]  # arcsec
+    sersic_index: [0.3, 8.0]
+    axis_ratio: [0.1, 1.0]
+    position_angle: [0.0, 180.0]  # degrees
+    center_offset: [-5.0, 5.0]  # pixels
+  
+  # Noise model
+  noise:
+    sky_background: 0.01
+    read_noise: 5.0
+    gain: 2.5
+  
+  # Data paths (Google Drive)
+  drive_base: "/content/drive/MyDrive/DeepLeGATo++"
+  train_data_path: "${data.drive_base}/data/train"
+  val_data_path: "${data.drive_base}/data/val"
+  checkpoint_path: "${data.drive_base}/checkpoints"
+  
+  # Data generation
+  num_train_samples: 200000
+  num_val_samples: 20000
+  generate_on_the_fly: true
+  
+logging:
+  use_wandb: true
+  project_name: "DeepLeGATo++"
+  log_every_n_steps: 25
+  log_images_every_n_epochs: 5
+  
+  # Local logging
+  log_dir: "${data.drive_base}/logs"
+  
+validation:
+  val_check_interval: 1.0  # Every epoch
+  num_posterior_samples: 200  # For uncertainty estimation

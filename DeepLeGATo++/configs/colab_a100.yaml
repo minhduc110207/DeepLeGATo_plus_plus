@@ -1,0 +1,86 @@
+# Configuration optimized for Google Colab A100 GPU (40GB VRAM)
+
+model:
+  name: "DeepLeGATo++"
+  
+  backbone:
+    type: "swinv2_base_window8_256"
+    pretrained: true
+    embed_dim: 128
+    depths: [2, 2, 18, 2]
+    num_heads: [4, 8, 16, 32]
+    window_size: 8
+    gradient_checkpointing: false  # Not needed with 40GB
+    drop_path_rate: 0.2
+  
+  npe:
+    num_flow_layers: 16
+    hidden_dim: 512
+    num_transforms: 8
+    num_blocks: 4
+    dropout: 0.1
+    
+  num_params: 7
+  
+training:
+  batch_size: 64
+  accumulation_steps: 1
+  max_epochs: 100
+  
+  optimizer:
+    type: "AdamW"
+    learning_rate: 2.0e-4
+    weight_decay: 0.05
+    betas: [0.9, 0.999]
+  
+  scheduler:
+    type: "CosineAnnealingWarmRestarts"
+    T_0: 10
+    T_mult: 2
+    eta_min: 1.0e-6
+  
+  precision: "bf16-mixed"  # BF16 on A100
+  
+  checkpoint_every_n_epochs: 1
+  save_to_drive: true
+  resume_from_latest: true
+  early_stopping_patience: 15
+  
+data:
+  image_size: 256
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 4
+  
+  priors:
+    magnitude: [15.0, 28.0]
+    effective_radius: [0.1, 10.0]
+    sersic_index: [0.3, 8.0]
+    axis_ratio: [0.1, 1.0]
+    position_angle: [0.0, 180.0]
+    center_offset: [-5.0, 5.0]
+  
+  noise:
+    sky_background: 0.01
+    read_noise: 5.0
+    gain: 2.5
+  
+  drive_base: "/content/drive/MyDrive/DeepLeGATo++"
+  train_data_path: "${data.drive_base}/data/train"
+  val_data_path: "${data.drive_base}/data/val"
+  checkpoint_path: "${data.drive_base}/checkpoints"
+  
+  num_train_samples: 200000
+  num_val_samples: 20000
+  generate_on_the_fly: true
+  
+logging:
+  use_wandb: true
+  project_name: "DeepLeGATo++"
+  log_every_n_steps: 25
+  log_images_every_n_epochs: 3
+  log_dir: "${data.drive_base}/logs"
+  
+validation:
+  val_check_interval: 1.0
+  num_posterior_samples: 200

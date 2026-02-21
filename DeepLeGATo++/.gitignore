@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model files & checkpoints (too large for GitHub)
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+checkpoints/
+outputs/
+logs/
+wandb/
+
+# Data files
+data/
+*.h5
+*.hdf5
+*.fits
+*.npy
+*.npz
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Misc
+*.zip
+*.tar.gz
+*.log
