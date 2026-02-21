@@ -6,7 +6,7 @@
 
 ---
 
-## 🌌 What Is This?
+## What Is This?
 
 **DeepLeGATo++** (Deep Learning Galaxy Tool++) is a deep learning framework for **automated galaxy morphology estimation**. Given an image of a galaxy, the model predicts the structural parameters that describe its shape, size, brightness, and orientation — along with **full uncertainty quantification** for each prediction.
 
@@ -54,7 +54,7 @@ For each parameter, the model outputs:
 
 ---
 
-## 🧠 How Does It Work?
+## How Does It Work?
 
 ### Architecture
 
@@ -84,7 +84,7 @@ Galaxy Image ──→ Swin Transformer V2 ──→ NPE Head ──→ Posterio
 
 ---
 
-## ⚡ Quick Start (Google Colab)
+## Quick Start (Google Colab)
 
 1. Upload this folder to Google Drive as `My Drive/DeepLeGATo++/`
 2. Open `notebooks/03_Training.ipynb` in Google Colab
@@ -160,7 +160,7 @@ DeepLeGATo++/
 
 ---
 
-## 💻 GPU Requirements
+## GPU Requirements
 
 | GPU | VRAM | Batch Size | Estimated Training Time |
 |-----|------|------------|------------------------|
@@ -198,7 +198,7 @@ Unlike traditional methods that find a single best-fit, NPE learns the full post
 
 ---
 
-## 🏗️ Built With
+## Built With
 
 - [PyTorch](https://pytorch.org/) — Deep learning framework
 - [PyTorch Lightning](https://lightning.ai/) — Training infrastructure
