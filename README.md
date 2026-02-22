@@ -177,7 +177,7 @@ DeepLeGATo++/
 The Sérsic profile is the standard model for describing galaxy surface brightness:
 
 ```
-$I(r) = I_e × exp( -b_n × [(r/R_e)^(1/n) - 1] )$
+$$I(r) = I_e × exp( -b_n × [(r/R_e)^(1/n) - 1] )$$
 ```
 
 Where:
